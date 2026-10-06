@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dürüm Snake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    box-sizing:border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg:#17100B;
+    --panel:rgba(255,255,255,.07);
+    --line:rgba(255,255,255,.12);
+    --gold:#F2A93B;
+    --paper:#FBF1DC;
+    --muted:#BBA98C;
+    --tomato:#E5533C;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    background:#17100B;
+  }
+  body{
+    background: radial-gradient(120% 70% at 50% 0%, #3A2517 0%, #17100B 65%);
+    font-family:'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color:var(--paper);
+    touch-action:none;
+    -webkit-user-select:none; user-select:none;
+  }
+  #app{
+    height:100%;
+    max-width:480px;
+    margin:0 auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:10px 14px 12px;
+  }
+  .topbar{
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; padding-bottom:10px;
+  }
+  .brand{
+    font-family:'Baloo 2', 'Outfit', sans-serif;
+    font-weight:800; font-size:21px; line-height:1;
+    color:var(--gold);
+    display:flex; align-items:center; gap:8px;
+  }
+  .brand i{ font-style:normal; font-size:24px; }
+  .right{ display:flex; align-items:center; gap:8px; }
+  .chip{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:5px 12px;
+    text-align:center;
+    min-width:62px;
+  }
+  .chip small{
+    display:block; font-size:9.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); font-weight:600;
+  }
+  .chip b{
+    font-family:'Baloo 2', 'Outfit', sans-serif;
+    font-size:20px; line-height:1.1; font-weight:700;
+  }
+  .chip.best b{ color:var(--gold); }
+  .mute{
+    width:38px; height:38px; border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--panel); color:var(--paper);
+    font-size:17px; display:flex; align-items:center; justify-content:center;
+  }
+  .mute:active{ transform:scale(.92); }
+
+  #stage{
+    flex:1; width:100%; min-height:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #board{
+    position:relative;
+    border-radius:22px;
+    overflow:hidden;
+    background-color:#2A1B12;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.075) 1.4px, transparent 1.9px),
+      radial-gradient(90% 80% at 50% 35%, #3E2A1B 0%, #20150D 100%);
+    background-size: var(--cell,30px) var(--cell,30px), 100% 100%;
+    box-shadow:
+      0 0 0 2px rgba(242,169,59,.38),
+      0 0 34px rgba(242,169,59,.14),
+      0 24px 50px rgba(0,0,0,.55);
+  }
+  canvas{ display:block; touch-action:none; }
+
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:22px;
+    background:rgba(18,11,7,.8);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+  .overlay .big{ font-size:46px; line-height:1; margin-bottom:6px; }
+  .overlay h1{
+    font-family:'Baloo 2','Outfit',sans-serif;
+    font-size:30px; margin:0 0 6px; color:var(--gold);
+  }
+  .overlay p{ margin:4px 0 18px; color:#E9DAC0; line-height:1.45; font-size:15px; }
+  .overlay .newbest{ color:var(--tomato); font-weight:700; }
+  .btn{
+    font-family:'Baloo 2','Outfit',sans-serif;
+    font-weight:700; font-size:18px;
+    border:none; padding:12px 30px; border-radius:999px;
+    background:linear-gradient(180deg, #F7B84D, #D98A22);
+    color:#2A1708;
+    box-shadow:0 4px 0 #8A5516, 0 10px 20px rgba(0,0,0,.4);
+    cursor:pointer;
+  }
+  .btn:active{ transform:translateY(2px); box-shadow:0 2px 0 #8A5516; }
+  .hint{ margin-top:10px; font-size:12px; color:var(--muted); }
+
+  .dpad{
+    display:grid;
+    grid-template-columns:repeat(3,58px);
+    grid-template-rows:repeat(2,52px);
+    gap:8px; margin-top:12px; flex-shrink:0;
+  }
+  .dpad button{
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
+    color:var(--gold); font-size:18px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .dpad button:active{ background:rgba(242,169,59,.25); transform:scale(.95); }
+  .dpad .up{ grid-column:2; grid-row:1; }
+  .dpad .left{ grid-column:1; grid-row:2; }
+  .dpad .down{ grid-column:2; grid-row:2; }
+  .dpad .right{ grid-column:3; grid-row:2; }
+
+  .legend{
+    display:flex; gap:12px; margin-top:10px; font-size:11px;
+    color:var(--muted); flex-wrap:wrap; justify-content:center;
+  }
+  .legend span{ display:flex; align-items:center; gap:5px; }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><i>🌯</i>Dürüm Snake</div>
+    <div class="right">
+      <div class="chip"><small>Punkte</small><b id="score">0</b></div>
+      <div class="chip best"><small>Rekord</small><b id="best">0</b></div>
+      <button class="mute" id="muteBtn" aria-label="Ton an/aus">🔊</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div id="board">
+      <canvas id="game"></canvas>
+      <div class="overlay show" id="startOverlay">
+        <div class="big">🌯</div>
+        <h1>Dürüm Snake</h1>
+        <p>Rolle durchs Spielfeld und sammle<br>Fleisch, Salat, Zwiebeln &amp; Tomaten.<br>Die Wände sind offen – du kommst auf der<br>anderen Seite wieder raus. Nur nicht in<br>dich selbst rollen!</p>
+        <button class="btn" id="startBtn">Los geht's</button>
+        <div class="hint">Wischen, Pfeiltasten oder Steuerkreuz</div>
+      </div>
+      <div class="overlay" id="overOverlay">
+        <div class="big">🥙</div>
+        <h1>Aufgegessen!</h1>
+        <p id="finalScore">Punkte: 0</p>
+        <button class="btn" id="restartBtn">Nochmal wickeln</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dpad" id="dpad">
+    <button class="up" data-dir="up" aria-label="Hoch">▲</button>
+    <button class="left" data-dir="left" aria-label="Links">◀</button>
+    <button class="down" data-dir="down" aria-label="Runter">▼</button>
+    <button class="right" data-dir="right" aria-label="Rechts">▶</button>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#9B4230"></span>Fleisch 10</span>
+    <span><span class="dot" style="background:#8FB04F"></span>Salat 10</span>
+    <span><span class="dot" style="background:#E3D1EE"></span>Zwiebel 10</span>
+    <span><span class="dot" style="background:#E5533C"></span>Tomate 15</span>
+    <span><span class="dot" style="background:#F7EFD9"></span>Soße 25</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const COLS = 12, ROWS = 16, TAU = Math.PI * 2;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+  const board = document.getElementById('board');
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const finalScoreEl = document.getElementById('finalScore');
+  const muteBtn = document.getElementById('muteBtn');
+
+  /* ================= Sound (synthetisiert, keine Dateien) ================= */
+  const Sound = (function(){
+    let actx = null, muted = false;
+    function ensure(){
+      try{
+        if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+      }catch(e){}
+    }
+    function tone(freq, type, t0, dur, peak){
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+    function noise(t0, dur, peak, hp){
+      const n = Math.floor(actx.sampleRate * dur);
+      const buf = actx.createBuffer(1, n, actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+      const g = actx.createGain();
+      g.gain.setValueAtTime(peak, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(f); f.connect(g); g.connect(actx.destination);
+      src.start(t0);
+    }
+    function eat(key){
+      if (muted || !actx) return;
+      const t = actx.currentTime;
+      if (key === 'meat'){ tone(140,'sine',t,.16,.35); noise(t,.08,.12,300); }
+      else if (key === 'lettuce'){ tone(560,'triangle',t,.09,.22); noise(t,.07,.18,3500); }
+      else if (key === 'onion'){ tone(400,'square',t,.1,.14); noise(t,.09,.16,2600); }
+      else if (key === 'tomato'){ tone(260,'sine',t,.14,.28); tone(320,'sine',t+.04,.12,.16); }
+      else { tone(760,'triangle',t,.1,.2); tone(980,'sine',t+.05,.16,.18); tone(1180,'sine',t+.1,.14,.14); }
+    }
+    function whoosh(){
+      if (muted || !actx) return;
+      const t = actx.currentTime;
+      noise(t, .14, .07, 900);
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.exponentialRampToValueAtTime(520, t + .12);
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(.06, t + .03);
+      g.gain.exponentialRampToValueAtTime(.0001, t + .14);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + .16);
+    }
+    function over(){
+      if (muted || !actx) return;
+      const t = actx.currentTime;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(320, t);
+      o.frequency.exponentialRampToValueAtTime(55, t + .55);
+      g.gain.setValueAtTime(.001, t);
+      g.gain.exponentialRampToValueAtTime(.26, t + .03);
+      g.gain.exponentialRampToValueAtTime(.0001, t + .6);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + .65);
+      noise(t, .3, .18, 200);
+    }
+    function start(){
+      ensure();
+      if (muted || !actx) return;
+      const t = actx.currentTime;
+      [440,554,659,880].forEach((f,i)=> tone(f,'triangle',t+i*.075,.16,.22));
+    }
+    function toggle(){ muted = !muted; if (!muted) ensure(); return muted; }
+    return { eat, whoosh, over, start, toggle };
+  })();
+
+  muteBtn.addEventListener('click', ()=>{
+    muteBtn.textContent = Sound.toggle() ? '🔇' : '🔊';
+  });
+
+  /* ================= Zutaten ================= */
+  const ING = {
+    meat:    { key:'meat',    points:10, weight:5, burst:'#9B4230' },
+    lettuce: { key:'lettuce', points:10, weight:5, burst:'#8FB04F' },
+    onion:   { key:'onion',   points:10, weight:4, burst:'#D8BFE8' },
+    tomato:  { key:'tomato',  points:15, weight:3, burst:'#E5533C' },
+    sauce:   { key:'sauce',   points:25, weight:1, burst:'#F7EFD9' },
+  };
+  const BAG = Object.values(ING).flatMap(i => Array(i.weight).fill(i));
+
+  /* ================= Zustand ================= */
+  let cell = 30, W = 360, H = 480;
+  let snake, prev, segFill, dir, dirQueue, food;
+  let score = 0, best = 0, running = false, tickMs = 170, lastTick = 0, lastFrame = 0, shake = 0;
+  const particles = [], floaters = [];
+
+  function sizeCanvas(){
+    const maxW = stage.clientWidth, maxH = stage.clientHeight;
+    if (maxW < 50 || maxH < 50) return;
+    cell = Math.max(16, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+    W = cell * COLS; H = cell * ROWS;
+    board.style.width = W + 'px';
+    board.style.height = H + 'px';
+    board.style.setProperty('--cell', cell + 'px');
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+
+  function spawnFood(){
+    let x, y;
+    do {
+      x = Math.floor(Math.random()*COLS);
+      y = Math.floor(Math.random()*ROWS);
+    } while (snake.some(s => s.x===x && s.y===y));
+    food = { x, y, ing: BAG[Math.floor(Math.random()*BAG.length)] };
+  }
+
+  function resetGame(){
+    const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
+    snake = [ {x:cx,y:cy}, {x:cx-1,y:cy}, {x:cx-2,y:cy}, {x:cx-3,y:cy} ];
+    prev = snake.map(s => ({x:s.x, y:s.y}));
+    segFill = [ ING.meat, ING.meat, ING.lettuce, ING.tomato ];
+    dir = {x:1, y:0};
+    dirQueue = [];
+    score = 0;
+    tickMs = 170;
+    scoreEl.textContent = '0';
+    particles.length = 0; floaters.length = 0;
+    spawnFood();
+  }
+
+  function loadBest(){
+    try{
+      const v = localStorage.getItem('durum-snake-best');
+      if (v) { best = parseInt(v,10) || 0; bestEl.textContent = best; }
+    }catch(e){}
+  }
+  function saveBest(){
+    try{ localStorage.setItem('durum-snake-best', String(best)); }catch(e){}
+  }
+
+  /* ================= Zeichnen: Zutaten ================= */
+  function rr(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function drawIcon(key, cx, cy, s, glow){
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (key === 'meat'){
+      const pts = [[.85,.05],[.55,.65],[0,.9],[-.55,.7],[-.85,.1],[-.6,-.55],[-.1,-.85],[.5,-.7],[.8,-.35]];
+      ctx.beginPath();
+      pts.forEach(([px,py],i)=>{ const x=cx+px*s*.46, y=cy+py*s*.46; i? ctx.lineTo(x,y): ctx.moveTo(x,y); });
+      ctx.closePath();
+      ctx.fillStyle = '#9B4230'; ctx.fill();
+      ctx.strokeStyle = '#55200F'; ctx.lineWidth = s*.06; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,205,160,.28)';
+      ctx.beginPath(); ctx.ellipse(cx-s*.12, cy-s*.17, s*.14, s*.07, -.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(40,12,5,.55)'; ctx.lineWidth = s*.05;
+      ctx.beginPath(); ctx.moveTo(cx-s*.2,cy-s*.02); ctx.lineTo(cx+s*.2,cy+s*.2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx-s*.12,cy+s*.2); ctx.lineTo(cx+s*.22,cy+s*.34); ctx.stroke();
+    }
+    else if (key === 'lettuce'){
+      ctx.beginPath();
+      for (let i=0;i<=44;i++){
+        const a = i/44*TAU, r = s*.44*(1+.15*Math.sin(a*7));
+        const x = cx+Math.cos(a)*r, y = cy+Math.sin(a)*r*.86;
+        i? ctx.lineTo(x,y): ctx.moveTo(x,y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#8FB04F'; ctx.fill();
+      ctx.strokeStyle = '#4F6A25'; ctx.lineWidth = s*.05; ctx.stroke();
+      ctx.fillStyle = 'rgba(225,245,165,.35)';
+      ctx.beginPath(); ctx.ellipse(cx-s*.06, cy-s*.08, s*.2, s*.14, -.4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = s*.035;
+      for (let i=-1;i<=1;i++){
+        ctx.beginPath(); ctx.moveTo(cx, cy+s*.26); ctx.lineTo(cx+i*s*.24, cy-s*.26); ctx.stroke();
+      }
+    }
+    else if (key === 'onion'){
+      ctx.beginPath(); ctx.arc(cx,cy,s*.44,0,TAU);
+      ctx.fillStyle = '#F6EDF9'; ctx.fill();
+      ctx.strokeStyle = '#8F6EA6'; ctx.lineWidth = s*.07; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,s*.27,0,TAU);
+      ctx.strokeStyle = '#C3A0D6'; ctx.lineWidth = s*.07; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,s*.1,0,TAU);
+      ctx.fillStyle = 'rgba(190,150,210,.55)'; ctx.fill();
+    }
+    else if (key === 'tomato'){
+      ctx.beginPath(); ctx.arc(cx,cy,s*.44,0,TAU);
+      ctx.fillStyle = '#E5533C'; ctx.fill();
+      ctx.strokeStyle = '#8E2A1C'; ctx.lineWidth = s*.06; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,s*.27,0,TAU);
+      ctx.fillStyle = '#F28B72'; ctx.fill();
+      for (let i=0;i<5;i++){
+        const a = i/5*TAU;
+        ctx.strokeStyle = 'rgba(150,40,25,.55)'; ctx.lineWidth = s*.035;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*s*.42, cy+Math.sin(a)*s*.42); ctx.stroke();
+        ctx.fillStyle = '#F8DE86';
+        ctx.beginPath(); ctx.ellipse(cx+Math.cos(a+.3)*s*.17, cy+Math.sin(a+.3)*s*.17, s*.05, s*.028, a, 0, TAU); ctx.fill();
+      }
+    }
+    else { // sauce
+      if (glow){ ctx.shadowColor = 'rgba(247,239,217,.95)'; ctx.shadowBlur = s*.5; }
+      ctx.beginPath(); ctx.arc(cx, cy+s*.1, s*.32, 0, TAU);
+      ctx.fillStyle = '#F9F1DC'; ctx.fill();
+      ctx.strokeStyle = '#D9A04A'; ctx.lineWidth = s*.05; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx-s*.26, cy-s*.04);
+      ctx.quadraticCurveTo(cx-s*.04, cy-s*.42, cx+s*.28, cy-s*.08);
+      ctx.strokeStyle = '#FFF8E6'; ctx.lineWidth = s*.1; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawFood(now){
+    const bob = Math.sin(now/280) * cell * .045;
+    const cx = food.x*cell + cell/2, cy = food.y*cell + cell/2 + bob;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(cx, food.y*cell + cell*.86, cell*.3, cell*.08, 0, 0, TAU); ctx.fill();
+    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = cell*.2; ctx.shadowOffsetY = cell*.06;
+    drawIcon(food.ing.key, cx, cy, cell*.92, food.ing.key === 'sauce');
+    ctx.restore();
+  }
+
+  /* ================= Zeichnen: Dürüm-Snake ================= */
+  function wrapD(d, n){ if (d > n/2) d -= n; else if (d < -n/2) d += n; return d; }
+
+  function computeChain(t){
+    const pts = snake.map((c,i)=>{
+      const p = prev[i];
+      return { x: p.x + wrapD(c.x-p.x, COLS)*t, y: p.y + wrapD(c.y-p.y, ROWS)*t };
+    });
+    const chain = [{ x:(pts[0].x+.5)*cell, y:(pts[0].y+.5)*cell }];
+    for (let i=1;i<pts.length;i++){
+      chain.push({
+        x: chain[i-1].x + wrapD(pts[i].x-pts[i-1].x, COLS)*cell,
+        y: chain[i-1].y + wrapD(pts[i].y-pts[i-1].y, ROWS)*cell
+      });
+    }
+    const sx = (((chain[0].x % W)+W)%W) - chain[0].x;
+    const sy = (((chain[0].y % H)+H)%H) - chain[0].y;
+    chain.forEach(p => { p.x += sx; p.y += sy; });
+    return chain;
+  }
+
+  function tracePath(chain, a, b){
+    ctx.beginPath();
+    ctx.moveTo(chain[a].x, chain[a].y);
+    for (let i=a+1;i<=b;i++) ctx.lineTo(chain[i].x, chain[i].y);
+  }
+
+  function drawHead(x, y, ang){
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang); ctx.scale(cell, cell);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // Schatten
+    ctx.fillStyle = 'rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(.02,.09,.62,.5,0,0,TAU); ctx.fill();
+    // Fladenbrot-Kappe
+    rr(-.5,-.46,1.02,.92,.4);
+    const g = ctx.createLinearGradient(0,-.46,0,.46);
+    g.addColorStop(0,'#F7E1AE'); g.addColorStop(1,'#D8AC62');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#B2701F'; ctx.lineWidth = .05; ctx.stroke();
+    // Rolllinie
+    ctx.strokeStyle = 'rgba(150,95,40,.35)'; ctx.lineWidth = .035;
+    ctx.beginPath(); ctx.moveTo(-.3,-.4); ctx.quadraticCurveTo(-.18,0,-.3,.4); ctx.stroke();
+    // Öffnung vorne (dunkel)
+    ctx.beginPath(); ctx.ellipse(.5,0,.17,.4,0,0,TAU);
+    ctx.fillStyle = '#5E3213'; ctx.fill();
+    ctx.strokeStyle = '#E8C37A'; ctx.lineWidth = .05; ctx.stroke();
+    // Füllung quillt heraus: Salat
+    ctx.beginPath();
+    for (let i=0;i<=40;i++){
+      const a = i/40*TAU, k = 1 + .13*Math.sin(a*6);
+      const px = .6 + Math.cos(a)*.24*k, py = Math.sin(a)*.35*k;
+      i? ctx.lineTo(px,py): ctx.moveTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#8FB04F'; ctx.fill();
+    ctx.strokeStyle = '#4F6A25'; ctx.lineWidth = .03; ctx.stroke();
+    // Tomate + Fleisch
+    drawIcon('tomato', .66, .17, .34, false);
+    drawIcon('meat', .68, -.16, .36, false);
+    // Augen
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(.04,-.2,.1,0,TAU); ctx.arc(.04,.2,.1,0,TAU); ctx.fill();
+    ctx.fillStyle = '#241812';
+    ctx.beginPath(); ctx.arc(.07,-.2,.055,0,TAU); ctx.arc(.07,.2,.055,0,TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSnakeParts(chain){
+    const n = chain.length;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+    // Schatten
+    ctx.save(); ctx.translate(0, cell*.08);
+    tracePath(chain,0,n-1); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = cell*.84; ctx.stroke();
+    ctx.restore();
+    // Kruste
+    tracePath(chain,0,n-1); ctx.strokeStyle = '#B2701F'; ctx.lineWidth = cell*.84; ctx.stroke();
+    // Fladenbrot
+    tracePath(chain,0,n-1); ctx.strokeStyle = '#EBCB8E'; ctx.lineWidth = cell*.72; ctx.stroke();
+    // heller Mittelstreifen (wie Fladenbrot-Glanz)
+    tracePath(chain,0,n-1); ctx.strokeStyle = 'rgba(255,244,216,.6)'; ctx.lineWidth = cell*.46; ctx.stroke();
+
+    // Wickel-Linien quer zur Rolle
+    ctx.strokeStyle = 'rgba(150,95,40,.38)'; ctx.lineWidth = Math.max(1, cell*.045);
+    for (let i=0;i<n-1;i++){
+      const a = chain[i], b = chain[i+1];
+      const dx = b.x-a.x, dy = b.y-a.y, len = Math.hypot(dx,dy);
+      if (len < cell*.2) continue;
+      const nx = -dy/len, ny = dx/len;
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      ctx.beginPath();
+      ctx.moveTo(mx - nx*cell*.33, my - ny*cell*.33);
+      ctx.lineTo(mx + nx*cell*.33, my + ny*cell*.33);
+      ctx.stroke();
+    }
+
+    // Alufolie am Ende (wie ein echter Dürüm)
+    const m = { x:(chain[n-2].x+chain[n-1].x)/2, y:(chain[n-2].y+chain[n-1].y)/2 };
+    const t = chain[n-1];
+    ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(m.x,m.y); ctx.lineTo(t.x,t.y);
+    ctx.strokeStyle = '#B9C0CB'; ctx.lineWidth = cell*.74; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(m.x,m.y); ctx.lineTo(t.x,t.y);
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = cell*.3; ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(t.x,t.y,cell*.37,0,TAU); ctx.fillStyle = '#B9C0CB'; ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x-cell*.05,t.y-cell*.05,cell*.17,0,TAU); ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.fill();
+    // Falz der Folie
+    const fdx = t.x-chain[n-2].x, fdy = t.y-chain[n-2].y, fl = Math.hypot(fdx,fdy);
+    if (fl > cell*.1){
+      const nx = -fdy/fl, ny = fdx/fl;
+      ctx.strokeStyle = 'rgba(70,80,95,.5)'; ctx.lineWidth = Math.max(1, cell*.05);
+      ctx.beginPath();
+      ctx.moveTo(m.x - nx*cell*.36, m.y - ny*cell*.36);
+      ctx.lineTo(m.x + nx*cell*.36, m.y + ny*cell*.36);
+      ctx.stroke();
+    }
+
+    // gesammelte Zutaten schimmern in der Rolle
+    for (let i=1;i<n-1;i++){
+      const ing = segFill[i]; if (!ing) continue;
+      drawIcon(ing.key, chain[i].x, chain[i].y, cell*.64, false);
+    }
+
+    // Kopf
+    let ang = Math.atan2(dir.y, dir.x);
+    const hx = chain[0].x-chain[1].x, hy = chain[0].y-chain[1].y;
+    if (Math.hypot(hx,hy) > cell*.05) ang = Math.atan2(hy,hx);
+    drawHead(chain[0].x, chain[0].y, ang);
+  }
+
+  function render(now, dt, t){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if (shake > 0){
+      shake -= dt;
+      ctx.translate((Math.random()-.5)*cell*.3, (Math.random()-.5)*cell*.3);
+    }
+    drawFood(now);
+
+    const chain = computeChain(t);
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    chain.forEach(p=>{ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+    const pad = cell;
+    const kx0 = Math.ceil((-pad-maxX)/W), kx1 = Math.floor((W+pad-minX)/W);
+    const ky0 = Math.ceil((-pad-maxY)/H), ky1 = Math.floor((H+pad-minY)/H);
+    for (let kx=kx0; kx<=kx1; kx++){
+      for (let ky=ky0; ky<=ky1; ky++){
+        ctx.save(); ctx.translate(kx*W, ky*H);
+        drawSnakeParts(chain);
+        ctx.restore();
+      }
+    }
+
+    // Partikel
+    for (let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0){ particles.splice(i,1); continue; }
+      p.vy += 520*dt*(cell/30);
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      ctx.globalAlpha = Math.max(0, p.life/p.max);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Punkte-Popups
+    for (let i=floaters.length-1;i>=0;i--){
+      const f = floaters[i];
+      f.life -= dt;
+      if (f.life <= 0){ floaters.splice(i,1); continue; }
+      f.y -= 46*dt*(cell/30);
+      ctx.globalAlpha = Math.min(1, f.life/.5);
+      ctx.font = '800 ' + Math.round(cell*.72) + 'px "Baloo 2", Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = cell*.14; ctx.strokeStyle = 'rgba(30,15,5,.85)';
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = '#FFD27A';
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  /* ================= Spiellogik ================= */
+  function burst(x, y, color){
+    for (let i=0;i<16;i++){
+      const a = Math.random()*TAU, sp = (50 + Math.random()*150) * (cell/30);
+      const life = .45 + Math.random()*.3;
+      particles.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-40*(cell/30),
+        life, max:life, color, size:(1.8 + Math.random()*3.2)*(cell/30) });
+    }
+  }
+
+  function step(){
+    if (dirQueue.length) dir = dirQueue.shift();
+    const head = snake[0];
+    let nx = head.x + dir.x, ny = head.y + dir.y;
+    let wrapped = false;
+    if (nx < 0){ nx = COLS-1; wrapped = true; } else if (nx >= COLS){ nx = 0; wrapped = true; }
+    if (ny < 0){ ny = ROWS-1; wrapped = true; } else if (ny >= ROWS){ ny = 0; wrapped = true; }
+
+    const eating = (nx === food.x && ny === food.y);
+    const solid = eating ? snake : snake.slice(0, -1);
+    if (solid.some(s => s.x===nx && s.y===ny)) return endGame();
+
+    const old = snake.map(s => ({x:s.x, y:s.y}));
+    snake.unshift({x:nx, y:ny});
+
+    if (eating){
+      // Kopf wächst heraus, Körper bleibt stehen
+      prev = [ old[0], ...old.map(s => ({x:s.x, y:s.y})) ];
+      segFill.splice(1, 0, food.ing);
+      score += food.ing.points;
+      scoreEl.textContent = score;
+      tickMs = Math.max(90, tickMs - 2);
+      const fx = food.x*cell + cell/2, fy = food.y*cell + cell/2;
+      burst(fx, fy, food.ing.burst);
+      floaters.push({ x:fx, y:fy - cell*.3, text:'+' + food.ing.points, life:.9 });
+      Sound.eat(food.ing.key);
+      spawnFood();
+    } else {
+      prev = old;
+      snake.pop();
+      if (wrapped) Sound.whoosh();
+    }
+  }
+
+  function endGame(){
+    running = false;
+    shake = .35;
+    Sound.over();
+    if (score > best){ best = score; bestEl.textContent = best; saveBest(); }
+    finalScoreEl.innerHTML = 'Punkte: ' + score +
+      (score === best && score > 0 ? '<br><span class="newbest">Neuer Rekord!</span>' : '');
+    setTimeout(()=> overOverlay.classList.add('show'), 380);
+  }
+
+  function startGame(){
+    Sound.start();
+    startOverlay.classList.remove('show');
+    overOverlay.classList.remove('show');
+    resetGame();
+    running = true;
+    lastTick = performance.now();
+  }
+
+  function frame(now){
+    requestAnimationFrame(frame);
+    const dt = Math.min(.05, (now - (lastFrame || now)) / 1000);
+    lastFrame = now;
+    let t = 1;
+    if (running){
+      if (now - lastTick > tickMs*3) lastTick = now;
+      while (running && now - lastTick >= tickMs){ step(); lastTick += tickMs; }
+      t = running ? Math.min(1, (now - lastTick)/tickMs) : 1;
+    }
+    render(now, dt, t);
+  }
+
+  /* ================= Steuerung ================= */
+  function setDir(nx, ny){
+    if (!running) return;
+    const last = dirQueue.length ? dirQueue[dirQueue.length-1] : dir;
+    if (nx === last.x && ny === last.y) return;
+    if (nx === -last.x && ny === -last.y) return;
+    if (dirQueue.length < 2) dirQueue.push({x:nx, y:ny});
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('restartBtn').addEventListener('click', startGame);
+
+  document.getElementById('dpad').addEventListener('pointerdown', (e)=>{
+    const b = e.target.closest('button[data-dir]');
+    if (!b) return;
+    e.preventDefault();
+    const d = b.dataset.dir;
+    if (d==='up') setDir(0,-1);
+    if (d==='down') setDir(0,1);
+    if (d==='left') setDir(-1,0);
+    if (d==='right') setDir(1,0);
+  });
+
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k)) e.preventDefault();
+    if (!running && (k === 'Enter' || k === ' ')){ startGame(); return; }
+    if (k==='ArrowUp'   || k==='w' || k==='W') setDir(0,-1);
+    if (k==='ArrowDown' || k==='s' || k==='S') setDir(0,1);
+    if (k==='ArrowLeft' || k==='a' || k==='A') setDir(-1,0);
+    if (k==='ArrowRight'|| k==='d' || k==='D') setDir(1,0);
+  }, {passive:false});
+
+  let ts = null;
+  window.addEventListener('touchstart', (e)=>{
+    if (e.target.closest('button')) return;
+    const t = e.changedTouches[0];
+    ts = { x:t.clientX, y:t.clientY };
+  }, {passive:true});
+  window.addEventListener('touchend', (e)=>{
+    if (!ts) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - ts.x, dy = t.clientY - ts.y;
+    ts = null;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
+    else setDir(0, dy > 0 ? 1 : -1);
+  }, {passive:true});
+
+  /* ================= Start ================= */
+  loadBest();
+  resetGame();
+  sizeCanvas();
+  if (window.ResizeObserver) new ResizeObserver(sizeCanvas).observe(stage);
+  window.addEventListener('resize', sizeCanvas);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
